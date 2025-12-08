@@ -31,19 +31,54 @@ def ground_robot(box: Box, u_box: Box, dt: float = 1.0) -> Box:
 # pos' = pos + dt * vel
 # vel' = vel + dt * u
 # ----------------------------------------------------
-def double_integrator(box: Box, u_box: Box, dt: float = 0.1) -> Box:
-    xl, xu = box.low, box.up
-    ul, uu = u_box.low, u_box.up  # scalar control in a 1D box
-
-    # pos' bounds
-    pos_low  = xl[0] + dt * xl[1]
-    pos_high = xu[0] + dt * xu[1]
-
-    # vel' bounds
-    vel_low  = xl[1] + dt * ul[0]
-    vel_high = xu[1] + dt * uu[0]
-
-    return Box([pos_low, vel_low], [pos_high, vel_high])
+def double_integrator(x_box: Box, u_box: Box, dt=1.0):
+    """
+    Double integrator dynamics using matrix interval multiplication
+    
+    x' = A·x + B·u where:
+      A = [[1, dt],    B = [[0.5·dt²],
+           [0,  1]]         [dt    ]]
+    """
+    xl, xu = x_box.low, x_box.up
+    ul, uu = u_box.low, u_box.up
+    
+    # Define system matrices
+    A = np.array([[1, dt],
+                  [0, 1]])
+    
+    B = np.array([[0.5 * dt**2],
+                  [dt]])
+    
+    # Interval matrix multiplication: [A] * [x]
+    # For row i: sum_j A[i,j] * x_interval[j]
+    
+    # Position row: [1, dt] * [pos, vel]
+    # = 1·pos + dt·vel
+    pos_from_A_l = xl[0] + dt * xl[1]  # Minimum
+    pos_from_A_u = xu[0] + dt * xu[1]  # Maximum
+    
+    # Velocity row: [0, 1] * [pos, vel]
+    # = 0·pos + 1·vel = vel
+    vel_from_A_l = xl[1]
+    vel_from_A_u = xu[1]
+    
+    # Interval matrix multiplication: [B] * [u]
+    # Position: 0.5·dt²·accel
+    pos_from_B_l = 0.5 * dt**2 * ul[0]
+    pos_from_B_u = 0.5 * dt**2 * uu[0]
+    
+    # Velocity: dt·accel
+    vel_from_B_l = dt * ul[0]
+    vel_from_B_u = dt * uu[0]
+    
+    # Combine: x' = A·x + B·u
+    pos_l = pos_from_A_l + pos_from_B_l
+    pos_u = pos_from_A_u + pos_from_B_u
+    
+    vel_l = vel_from_A_l + vel_from_B_l
+    vel_u = vel_from_A_u + vel_from_B_u
+    
+    return Box([pos_l, vel_l], [pos_u, vel_u])
 
 
 # ----------------------------------------------------

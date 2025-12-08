@@ -1,0 +1,23 @@
+FBRA PERFORMANCE BENCHMARK RESULTS
+==========================================================================================
+
+ground_robot_safe:
+  Status: Safe
+  Time: 0.0000s
+  Iterations: 1
+
+ground_robot_buggy:
+  Status: Unsafe
+  Time: 0.6448s
+  Iterations: 3
+
+double_int_default:
+  Status: Safe
+  Time: 0.0026s
+  Iterations: 1
+
+double_int_pd:
+  Status: Safe
+  Time: 0.0000s
+  Iterations: 1
+

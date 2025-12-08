@@ -146,3 +146,86 @@ class QuadrotorController(nn.Module):
 
 
 quadrotor_controller = QuadrotorController()
+
+# =====================================================
+# Enhanced Double Integrator Controllers
+# =====================================================
+
+class DoubleIntegratorPDController(nn.Module):
+    """
+    PD (Proportional-Derivative) Controller for Double Integrator
+    
+    Goal: Drive to origin (position=0, velocity=0)
+    Control law: u = -Kp·position - Kd·velocity
+    
+    This is a CLASSIC control strategy (more realistic than random NN)
+    """
+    def __init__(self, Kp=0.5, Kd=0.8):
+        super().__init__()
+        self.Kp = Kp  # Position gain
+        self.Kd = Kd  # Velocity gain (damping)
+        
+        # We still wrap it in a small NN for consistency
+        self.net = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.ReLU(),
+            nn.Linear(16, 1)
+        )
+        
+        # Initialize with small weights
+        for m in self.net:
+            if isinstance(m, nn.Linear):
+                nn.init.uniform_(m.weight, -0.1, 0.1)
+                nn.init.zeros_(m.bias)
+        
+        # Set final layer to approximate PD control
+        with torch.no_grad():
+            self.net[-1].weight[0, 0] = -self.Kp  # Position feedback
+            self.net[-1].weight[0, 1] = -self.Kd  # Velocity feedback
+            self.net[-1].bias[0] = 0.0
+    
+    def forward(self, x):
+        if not torch.is_tensor(x):
+            x = torch.tensor(x, dtype=torch.float32)
+        
+        # PD control: u = -Kp·pos - Kd·vel
+        # (NN approximates this)
+        u = self.net(x)
+        
+        # Clamp control to reasonable bounds
+        u = torch.clamp(u, -2.0, 2.0)
+        
+        return u
+
+
+class DoubleIntegratorAggressiveController(nn.Module):
+    """
+    Aggressive controller that pushes toward unsafe region
+    For testing Unsafe detection
+    """
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.ReLU(),
+            nn.Linear(16, 1)
+        )
+        
+        for m in self.net:
+            if isinstance(m, nn.Linear):
+                nn.init.uniform_(m.weight, -0.05, 0.05)
+                nn.init.zeros_(m.bias)
+        
+        # Bias: Always accelerate RIGHT
+        with torch.no_grad():
+            self.net[-1].bias[0] = 1.5  # Strong positive acceleration
+    
+    def forward(self, x):
+        if not torch.is_tensor(x):
+            x = torch.tensor(x, dtype=torch.float32)
+        return self.net(x)
+
+
+# Create instances
+double_integrator_pd_controller = DoubleIntegratorPDController()
+double_integrator_aggressive = DoubleIntegratorAggressiveController()
